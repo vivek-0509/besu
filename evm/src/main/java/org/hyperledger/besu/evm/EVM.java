@@ -88,6 +88,9 @@ import org.hyperledger.besu.evm.operation.XorOperation;
 import org.hyperledger.besu.evm.operation.XorOperationOptimized;
 import org.hyperledger.besu.evm.tracing.OperationTracer;
 import org.hyperledger.besu.evm.v2.operation.AddOperationV2;
+import org.hyperledger.besu.evm.v2.operation.PopOperationV2;
+import org.hyperledger.besu.evm.v2.operation.Push0OperationV2;
+import org.hyperledger.besu.evm.v2.operation.PushOperationV2;
 import org.hyperledger.besu.evm.v2.operation.SarOperationV2;
 import org.hyperledger.besu.evm.v2.operation.ShlOperationV2;
 import org.hyperledger.besu.evm.v2.operation.ShrOperationV2;
@@ -500,6 +503,47 @@ public class EVM {
                   enableConstantinople
                       ? SarOperationV2.staticOperation(frame, frame.stackDataV2())
                       : InvalidOperation.invalidOperationResult(opcode);
+              case 0x50 -> PopOperationV2.staticOperation(frame);
+              case 0x5f ->
+                  enableShanghai
+                      ? Push0OperationV2.staticOperation(frame, frame.stackDataV2())
+                      : InvalidOperation.invalidOperationResult(opcode);
+              case 0x60 -> // PUSH1 — specialized for the most frequent opcode
+                  PushOperationV2.staticPush1(frame, frame.stackDataV2(), code, pc);
+              case 0x61 -> // PUSH2 — specialized for jump destinations
+                  PushOperationV2.staticPush2(frame, frame.stackDataV2(), code, pc);
+              case 0x62, // PUSH3-32
+                  0x63,
+                  0x64,
+                  0x65,
+                  0x66,
+                  0x67,
+                  0x68,
+                  0x69,
+                  0x6a,
+                  0x6b,
+                  0x6c,
+                  0x6d,
+                  0x6e,
+                  0x6f,
+                  0x70,
+                  0x71,
+                  0x72,
+                  0x73,
+                  0x74,
+                  0x75,
+                  0x76,
+                  0x77,
+                  0x78,
+                  0x79,
+                  0x7a,
+                  0x7b,
+                  0x7c,
+                  0x7d,
+                  0x7e,
+                  0x7f ->
+                  PushOperationV2.staticOperation(
+                      frame, frame.stackDataV2(), code, pc, opcode - PushOperationV2.PUSH_BASE);
               // TODO: implement remaining opcodes in v2; until then fall through to v1
               default -> {
                 frame.setCurrentOperation(currentOperation);

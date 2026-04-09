@@ -15,7 +15,6 @@
 package org.hyperledger.besu.ethereum.api.jsonrpc.websocket.subscription.transactionreceipts;
 
 import org.hyperledger.besu.datatypes.Hash;
-import org.hyperledger.besu.datatypes.Wei;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.TransactionReceiptListResult;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.TransactionReceiptResult;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.TransactionReceiptRootResult;
@@ -26,18 +25,13 @@ import org.hyperledger.besu.ethereum.api.query.BlockchainQueries;
 import org.hyperledger.besu.ethereum.api.query.TransactionReceiptWithMetadata;
 import org.hyperledger.besu.ethereum.chain.BlockAddedEvent;
 import org.hyperledger.besu.ethereum.chain.BlockAddedObserver;
-import org.hyperledger.besu.ethereum.core.Block;
 import org.hyperledger.besu.ethereum.core.BlockHeader;
-import org.hyperledger.besu.ethereum.core.Transaction;
-import org.hyperledger.besu.ethereum.core.TransactionReceipt;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
-import org.hyperledger.besu.ethereum.mainnet.ProtocolSpec;
 import org.hyperledger.besu.ethereum.mainnet.TransactionReceiptType;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 import com.google.common.base.Suppliers;
 
@@ -86,7 +80,7 @@ public class TransactionReceiptsSubscriptionService implements BlockAddedObserve
 
           for (final TransactionReceiptsSubscription subscription : subscribers) {
             final List<TransactionReceiptResult> allReceipts = receiptList.get();
-            if (allReceipts == null || allReceipts.isEmpty()) {
+            if (allReceipts.isEmpty()) {
               continue;
             }
 
@@ -114,72 +108,20 @@ public class TransactionReceiptsSubscriptionService implements BlockAddedObserve
   }
 
   private List<TransactionReceiptResult> buildReceiptResults(final Hash blockHash) {
-    final Optional<Block> maybeBlock = blockchainQueries.getBlockchain().getBlockByHash(blockHash);
-    if (maybeBlock.isEmpty()) {
-      return null;
+    return blockchainQueries
+        .transactionReceiptsByBlockHash(blockHash, protocolSchedule)
+        .orElse(Collections.emptyList())
+        .stream()
+        .map(this::toReceiptResult)
+        .toList();
+  }
+
+  private TransactionReceiptResult toReceiptResult(
+      final TransactionReceiptWithMetadata receiptWithMetadata) {
+    if (receiptWithMetadata.getReceipt().getTransactionReceiptType()
+        == TransactionReceiptType.ROOT) {
+      return new TransactionReceiptRootResult(receiptWithMetadata);
     }
-
-    final Block block = maybeBlock.get();
-    final BlockHeader header = block.getHeader();
-    final List<Transaction> transactions = block.getBody().getTransactions();
-    final Optional<List<TransactionReceipt>> maybeReceipts =
-        blockchainQueries.getBlockchain().getTxReceipts(blockHash);
-    if (maybeReceipts.isEmpty()) {
-      return null;
-    }
-
-    final List<TransactionReceipt> receipts = maybeReceipts.get();
-    final ProtocolSpec protocolSpec = protocolSchedule.getByBlockHeader(header);
-    final List<TransactionReceiptResult> results = new ArrayList<>(receipts.size());
-
-    int logIndexOffset = 0;
-    for (int i = 0; i < receipts.size(); i++) {
-      final TransactionReceipt receipt = receipts.get(i);
-      final Transaction transaction = transactions.get(i);
-
-      long gasUsed = receipt.getCumulativeGasUsed();
-      if (i > 0) {
-        gasUsed -= receipts.get(i - 1).getCumulativeGasUsed();
-      }
-
-      final Optional<Long> blobGasUsed =
-          transaction.getType().supportsBlob()
-              ? Optional.of(protocolSpec.getGasCalculator().blobGasCost(transaction.getBlobCount()))
-              : Optional.empty();
-
-      final Optional<Wei> blobGasPrice =
-          transaction.getType().supportsBlob()
-              ? header
-                  .getExcessBlobGas()
-                  .map(
-                      excessBlobGas ->
-                          protocolSpec.getFeeMarket().blobGasPricePerGas(excessBlobGas))
-              : Optional.empty();
-
-      final TransactionReceiptWithMetadata receiptWithMetadata =
-          TransactionReceiptWithMetadata.create(
-              receipt,
-              transaction,
-              transaction.getHash(),
-              i,
-              gasUsed,
-              header.getBaseFee(),
-              blockHash,
-              header.getTimestamp(),
-              header.getNumber(),
-              blobGasUsed,
-              blobGasPrice,
-              logIndexOffset);
-
-      if (receipt.getTransactionReceiptType() == TransactionReceiptType.ROOT) {
-        results.add(new TransactionReceiptRootResult(receiptWithMetadata));
-      } else {
-        results.add(new TransactionReceiptStatusResult(receiptWithMetadata));
-      }
-
-      logIndexOffset += receipt.getLogsList().size();
-    }
-
-    return results;
+    return new TransactionReceiptStatusResult(receiptWithMetadata);
   }
 }

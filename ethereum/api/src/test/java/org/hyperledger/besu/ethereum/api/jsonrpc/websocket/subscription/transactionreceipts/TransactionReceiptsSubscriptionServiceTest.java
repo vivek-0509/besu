@@ -24,8 +24,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import org.hyperledger.besu.datatypes.Hash;
+import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.BlockReceiptsResult;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.JsonRpcResult;
-import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.TransactionReceiptListResult;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.TransactionReceiptResult;
 import org.hyperledger.besu.ethereum.api.jsonrpc.websocket.subscription.SubscriptionManager;
 import org.hyperledger.besu.ethereum.api.query.BlockchainQueries;
@@ -116,10 +116,10 @@ public class TransactionReceiptsSubscriptionServiceTest {
     assertThat(subscriptionIdCaptor.getValue()).isEqualTo(subscription.getSubscriptionId());
 
     final JsonRpcResult result = responseCaptor.getValue();
-    assertThat(result).isInstanceOf(TransactionReceiptListResult.class);
+    assertThat(result).isInstanceOf(BlockReceiptsResult.class);
 
-    final TransactionReceiptListResult receiptListResult = (TransactionReceiptListResult) result;
-    assertThat(receiptListResult.getReceipts())
+    final BlockReceiptsResult receiptListResult = (BlockReceiptsResult) result;
+    assertThat(receiptListResult.getResults())
         .hasSize(testBlock.getBody().getTransactions().size());
   }
 
@@ -165,8 +165,8 @@ public class TransactionReceiptsSubscriptionServiceTest {
 
     final List<JsonRpcResult> results = responseCaptor.getAllValues();
     assertThat(results).hasSize(2);
-    assertThat(results.get(0)).isInstanceOf(TransactionReceiptListResult.class);
-    assertThat(results.get(1)).isInstanceOf(TransactionReceiptListResult.class);
+    assertThat(results.get(0)).isInstanceOf(BlockReceiptsResult.class);
+    assertThat(results.get(1)).isInstanceOf(BlockReceiptsResult.class);
   }
 
   @Test
@@ -207,10 +207,9 @@ public class TransactionReceiptsSubscriptionServiceTest {
     verify(subscriptionManagerSpy)
         .sendMessage(subscriptionIdCaptor.capture(), responseCaptor.capture());
 
-    final TransactionReceiptListResult receiptListResult =
-        (TransactionReceiptListResult) responseCaptor.getValue();
-    assertThat(receiptListResult.getReceipts()).hasSize(1);
-    assertThat(receiptListResult.getReceipts().get(0).getTransactionHash())
+    final BlockReceiptsResult receiptListResult = (BlockReceiptsResult) responseCaptor.getValue();
+    assertThat(receiptListResult.getResults()).hasSize(1);
+    assertThat(receiptListResult.getResults().get(0).getTransactionHash())
         .isEqualTo(targetTxHash.toString());
   }
 
@@ -239,9 +238,8 @@ public class TransactionReceiptsSubscriptionServiceTest {
     verify(subscriptionManagerSpy)
         .sendMessage(subscriptionIdCaptor.capture(), responseCaptor.capture());
 
-    final TransactionReceiptListResult receiptListResult =
-        (TransactionReceiptListResult) responseCaptor.getValue();
-    for (final TransactionReceiptResult receipt : receiptListResult.getReceipts()) {
+    final BlockReceiptsResult receiptListResult = (BlockReceiptsResult) responseCaptor.getValue();
+    for (final TransactionReceiptResult receipt : receiptListResult.getResults()) {
       assertThat(receipt.getBlockHash()).isEqualTo(testBlock.getHash().toString());
     }
   }
@@ -258,15 +256,12 @@ public class TransactionReceiptsSubscriptionServiceTest {
     verify(subscriptionManagerSpy, times(3))
         .sendMessage(subscriptionIdCaptor.capture(), responseCaptor.capture());
 
-    final TransactionReceiptListResult result1 =
-        (TransactionReceiptListResult) responseCaptor.getAllValues().get(0);
-    final TransactionReceiptListResult result2 =
-        (TransactionReceiptListResult) responseCaptor.getAllValues().get(1);
-    final TransactionReceiptListResult result3 =
-        (TransactionReceiptListResult) responseCaptor.getAllValues().get(2);
+    final BlockReceiptsResult result1 = (BlockReceiptsResult) responseCaptor.getAllValues().get(0);
+    final BlockReceiptsResult result2 = (BlockReceiptsResult) responseCaptor.getAllValues().get(1);
+    final BlockReceiptsResult result3 = (BlockReceiptsResult) responseCaptor.getAllValues().get(2);
 
-    assertThat(result1.getReceipts()).isEqualTo(result2.getReceipts());
-    assertThat(result2.getReceipts()).isEqualTo(result3.getReceipts());
+    assertThat(result1.getResults()).isEqualTo(result2.getResults());
+    assertThat(result2.getResults()).isEqualTo(result3.getResults());
   }
 
   private void mockSubscriptionManagerNotifyMethod(

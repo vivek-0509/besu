@@ -15,7 +15,7 @@
 package org.hyperledger.besu.ethereum.api.jsonrpc.websocket.subscription.transactionreceipts;
 
 import org.hyperledger.besu.datatypes.Hash;
-import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.TransactionReceiptListResult;
+import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.BlockReceiptsResult;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.TransactionReceiptResult;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.TransactionReceiptRootResult;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.results.TransactionReceiptStatusResult;
@@ -102,7 +102,7 @@ public class TransactionReceiptsSubscriptionService implements BlockAddedObserve
             }
 
             subscriptionManager.sendMessage(
-                subscription.getSubscriptionId(), new TransactionReceiptListResult(filtered));
+                subscription.getSubscriptionId(), new BlockReceiptsResult(filtered));
           }
         });
   }

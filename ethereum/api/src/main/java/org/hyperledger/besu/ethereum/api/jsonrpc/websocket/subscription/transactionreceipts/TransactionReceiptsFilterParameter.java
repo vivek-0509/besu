@@ -41,8 +41,4 @@ public class TransactionReceiptsFilterParameter {
   public List<Hash> getTransactionHashes() {
     return transactionHashes;
   }
-
-  public boolean isEmpty() {
-    return transactionHashes.isEmpty();
-  }
 }

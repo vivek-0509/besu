@@ -494,6 +494,57 @@ public class BesuCommandTest extends CommandTestAbstract {
   }
 
   @Test
+  public void startedPluginsAreStoppedWhenAServerFailsToStart() {
+    doThrow(new IllegalStateException("Service jsonRpc failed to start"))
+        .when(mockRunner)
+        .startExternalServices();
+
+    parseCommand();
+
+    // the plugins had started when the servers failed, so they are stopped before the failure
+    // propagates; the runner is left to the shutdown hook, which closes it on exit
+    final InOrder inOrder = inOrder(mockRunner, getBesuPluginContext());
+    inOrder.verify(getBesuPluginContext()).startPlugins();
+    inOrder.verify(mockRunner).startExternalServices();
+    inOrder.verify(getBesuPluginContext()).stopPluginsForRestart();
+    verify(mockRunner, never()).startEthereumMainLoop();
+    verify(mockRunner, never()).close();
+    assertThat(commandErrorOutput.toString(UTF_8)).contains("Service jsonRpc failed to start");
+  }
+
+  @Test
+  public void shutdownClosesTheRunnerAndTheClassLoaderWhenStoppingThePluginsThrows() {
+    final TestBesuCommand command = parseCommand();
+    doThrow(new NoClassDefFoundError("gone/Missing")).when(getBesuPluginContext()).stopPlugins();
+
+    command.shutdown();
+
+    final InOrder inOrder = inOrder(mockRunner, getBesuPluginContext());
+    inOrder.verify(getBesuPluginContext()).stopPlugins();
+    inOrder.verify(mockRunner).close();
+    inOrder.verify(getBesuPluginContext()).closePluginClassLoader();
+    verify(mockController, never()).close();
+  }
+
+  @Test
+  public void shutdownClosesTheControllerWhenTheRunnerCouldNotBeBuilt() {
+    when(mockRunnerBuilder.build())
+        .thenThrow(new RuntimeException("You can not override built in methods [eth_blockNumber]"));
+    final TestBesuCommand command = parseCommand();
+    assertThat(commandErrorOutput.toString(UTF_8))
+        .contains("You can not override built in methods");
+
+    command.shutdown();
+
+    // storage opened with the controller before the runner build failed: the controller is closed
+    final InOrder inOrder = inOrder(mockController, getBesuPluginContext());
+    inOrder.verify(getBesuPluginContext()).stopPlugins();
+    inOrder.verify(mockController).close();
+    inOrder.verify(getBesuPluginContext()).closePluginClassLoader();
+    verify(mockRunner, never()).close();
+  }
+
+  @Test
   @SuppressWarnings("removal") // MiningService is deprecated for removal; drop it from here with it
   public void runningServicesAreAddedOnceTheMainLoopIsUp() {
     parseCommand();
